@@ -4,6 +4,9 @@ pipeline{
         jdk 'jdk'
         nodejs 'node17'
     }
+    environment {
+        SCANNER_HOME=tool 'sonar-scanner'
+    }
     stages {
         stage('clean workspace'){
             steps{
@@ -14,6 +17,21 @@ pipeline{
             steps{
                 git branch: 'main', url: 'https://github.com/arulmurugan001/devopsprojectprime.git'
             }
+        }
+        stage("Sonarqube Analysis"){
+            steps{
+                withSonarQubeEnv('SonarQube') {
+                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=prime \
+                    -Dsonar.projectKey=prime '''
+                }
+            }
+        }
+        stage("Code Quality Gate"){
+           steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
+                }
+            } 
         }
         stage('Install Dependencies') {
             steps {
@@ -29,6 +47,11 @@ pipeline{
                        sh "docker push arulmurugan786/amazon-prime-video:latest "
                     }
                 }
+            }
+        }
+        stage("TRIVY"){
+            steps{
+                sh "trivy image arulmurugan786/amazon-prime-video:latest > trivyimage.txt" 
             }
         }
         stage('App Deploy to Docker container'){
@@ -59,6 +82,7 @@ pipeline{
                 from: 'arulmuruganchinnaraj6@gmail.com',
                 replyTo: 'arulmuruganchinnaraj6@gmail.com',
                 mimeType: 'text/html',
+                attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
             )
            }
        }
