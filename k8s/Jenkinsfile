@@ -42,16 +42,22 @@ pipeline {
             }
         }
         
-       stage('Test kubectl') {
+       stage('deploy to kubernetes') {
             steps {
+                dir('k8s'){
+                script
+                {
                 withCredentials([file(credentialsId: 'kubeconfig-file', variable: 'KUBECONFIG')]) {
-                    sh 'kubectl get nodes'
+                    sh '''
+                        kubectl get nodes
+                        kubectl apply -f manifest.yml
+                        '''
         }
     }
   }
-
-    }
-
+}
+}
+}
     post {
         always {
             script {
