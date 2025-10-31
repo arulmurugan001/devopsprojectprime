@@ -1,43 +1,52 @@
-pipeline{
+pipeline {
     agent any
-    tools{
+    tools {
         jdk 'jdk'
-        nodejs 'node17'
+        nodejs 'node18'
     }
     stages {
-        stage('clean workspace'){
-            steps{
+        stage('Clean Workspace') {
+            steps {
                 cleanWs()
             }
         }
-        stage('Checkout from Git'){
-            steps{
+
+        stage('Checkout from Git') {
+            steps {
                 git branch: 'main', url: 'https://github.com/arulmurugan001/devopsprojectprime.git'
             }
         }
         stage('Install Dependencies') {
             steps {
-                sh "npm install"
+                    sh "npm install"
             }
-        }        
-        stage("Docker Build & Push"){
-            steps{
-                script{
-                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
-                       sh "docker build -t amazon-prime-video ."
-                       sh "docker tag amazon-prime-video arulmurugan786/amazon-prime-video:latest "
-                       sh "docker push arulmurugan786/amazon-prime-video:latest "
+        }
+
+        stage('Docker Build & Push') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
+                        sh '''
+                            docker build -t amazon-prime-video .
+                            docker tag amazon-prime-video arulmurugan786/amazon-prime-video:latest
+                            docker push arulmurugan786/amazon-prime-video:latest
+                        '''
                     }
                 }
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh "trivy image arulmurugan786/amazon-prime-video:latest > trivyimage.txt"
             }
         }
         stage('App Deploy to Docker container'){
             steps{
                 sh 'docker rm -f amazon-prime-video || true'
-                sh 'docker run -d --name amazon-prime-video -p 3000:3000 arulmurugan786/amazon-prime-video:latest'
+                sh 'docker run -d --name amazon-prime-video -p 3001:3000 arulmurugan786/amazon-prime-video:latest'
             }
         }
-
     }
     post {
     always {
