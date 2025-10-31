@@ -24,10 +24,12 @@ kind: Service
 metadata:
   name: amazon-prime-video-service
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: amazon-prime-video
   ports:
   - port: 80
-    targetPort: 3000
+    targetPort: 80
+    nodePort: 31502
+
 
