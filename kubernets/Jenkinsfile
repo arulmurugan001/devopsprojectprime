@@ -1,67 +1,80 @@
-pipeline{
+pipeline {
     agent any
-    tools{
+    tools {
         jdk 'jdk'
-        nodejs 'node17'
+        nodejs 'node18'
     }
     stages {
-        stage('clean workspace'){
-            steps{
+        stage('Clean Workspace') {
+            steps {
                 cleanWs()
             }
         }
-        stage('Checkout from Git'){
-            steps{
+
+        stage('Checkout from Git') {
+            steps {
                 git branch: 'main', url: 'https://github.com/arulmurugan001/devopsprojectprime.git'
             }
         }
         stage('Install Dependencies') {
             steps {
-                sh "npm install"
+                    sh "npm install"
             }
-        }        
-        stage("Docker Build & Push"){
-            steps{
-                script{
-                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
-                       sh "docker build -t amazon-prime-video ."
-                       sh "docker tag amazon-prime-video arulmurugan001/amazon-prime-video:latest "
-                       sh "docker push arulmurugan001/amazon-prime-video:latest "
+        }
+
+        stage('Docker Build & Push') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
+                        sh '''
+                            docker build -t amazon-prime-video .
+                            docker tag amazon-prime-video arulmurugan786/amazon-prime-video:latest
+                            docker push arulmurugan786/amazon-prime-video:latest
+                        '''
                     }
                 }
             }
         }
-        stage('App Deploy to Docker container'){
-            steps{
-                sh 'docker run -d --name amazon-prime-video -p 3000:3000 arulmurugan001/amazon-prime-video:latest'
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh "trivy image arulmurugan786/amazon-prime-video:latest > trivyimage.txt"
             }
         }
+        
+       stage('Test kubectl') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig-file', variable: 'KUBECONFIG')]) {
+                    sh 'kubectl get nodes'
+        }
+    }
+  }
 
     }
+
     post {
-    always {
-        script {
-            def buildStatus = currentBuild.currentResult
-            def buildUser = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')[0]?.userId ?: 'Github User'
-            
-            emailext (
-                subject: "Pipeline ${buildStatus}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-                    <p>This is a Jenkins starbucks CICD pipeline status.</p>
-                    <p>Project: ${env.JOB_NAME}</p>
-                    <p>Build Number: ${env.BUILD_NUMBER}</p>
-                    <p>Build Status: ${buildStatus}</p>
-                    <p>Started by: ${buildUser}</p>
-                    <p>Build URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                """,
-                to: 'mohdaseemakram19@gmail.com',
-                from: 'mohdaseemakram19@gmail.com',
-                replyTo: 'mohdaseemakram19@gmail.com',
-                mimeType: 'text/html',
-            )
-           }
-       }
+        always {
+            script {
+                def buildStatus = currentBuild.currentResult
+                def buildUser = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')[0]?.userId ?: 'GitHub Trigger'
 
+                emailext(
+                    subject: "Pipeline ${buildStatus}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                    body: """
+                        <p><b>Jenkins CI/CD Pipeline Report</b></p>
+                        <p>Project: ${env.JOB_NAME}</p>
+                        <p>Build Number: ${env.BUILD_NUMBER}</p>
+                        <p>Status: <b>${buildStatus}</b></p>
+                        <p>Triggered By: ${buildUser}</p>
+                        <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                    """,
+                    to: 'muruganarul1993@gmail.com',
+                    from: 'muruganarul1993@gmail.com',
+                    replyTo: 'muruganarul1993@gmail.com',
+                    mimeType: 'text/html',
+                    attachmentsPattern: 'trivy*.txt'
+                )
+            }
+        }
     }
-
 }
