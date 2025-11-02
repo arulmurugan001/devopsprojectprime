@@ -1,10 +1,10 @@
-#deployment.yaml
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: amazon-prime-video-deployment
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: amazon-prime-video
@@ -14,7 +14,8 @@ spec:
         app: amazon-prime-video
     spec:
       containers:
-        - name: amazon-prime-video
-          image: arulmurugan786/amazon-prime-video:latest
-          ports:
-            - containerPort: 3000
+      - name: amazon-prime-video-container
+        image: arulmurugan786/amazon-prime-video
+        ports:
+        - containerPort: 3000
+
