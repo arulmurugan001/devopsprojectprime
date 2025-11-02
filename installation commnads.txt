@@ -1,0 +1,287 @@
+Install jenkins:
+
+Install Jenkins on Ubuntu
+
+sudo apt update -y
+wget -O - https://packages.adoptium.net/artifactory/api/gpg/key/public | sudo tee /etc/apt/keyrings/adoptium.asc
+echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
+sudo apt update -y
+sudo apt install temurin-17-jdk -y
+/usr/bin/java --version
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt-get update -y
+sudo apt-get install jenkins -y
+sudo systemctl start jenkins
+sudo systemctl status jenkins
+
+
+2--------------------------------------------------
+
+//java jdk//
+
+Install OpenJDK 17 JRE Headless
+sudo apt install openjdk-17-jre-headless -y
+
+//sonarqube://
+
+Install SonarQube using Docker
+$ docker run -d --name sonar -p 9000:9000 sonarqube:lts-community
+$ docker ps (You can see SonarQube container)
+
+
+//Install Trivy on Ubuntu//
+
+sudo apt-get install wget apt-transport-https gnupg
+wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+sudo apt-get update
+sudo apt-get install trivy
+
+
+//docker://
+
+
+# Add Docker's official GPG key:
+sudo apt-get update
+sudo apt-get install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+# Add the repository to Apt sources:
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+sudo usermod -aG docker ubuntu
+sudo chmod 777 /var/run/docker.sock
+newgrp docker
+sudo systemctl status docker
+
+//promethues://
+sudo useradd --system --no-create-home --shell /bin/false prometheus
+wget https://github.com/prometheus/prometheus/releases/download/v2.47.1/prometheus-2.47.1.linux-amd64.tar.gz
+
+Extract Prometheus files, move them, and create directories:
+tar -xvf prometheus-2.47.1.linux-amd64.tar.gz
+cd prometheus-2.47.1.linux-amd64/
+sudo mkdir -p /data /etc/prometheus
+sudo mv prometheus promtool /usr/local/bin/
+sudo mv consoles/ console_libraries/ /etc/prometheus/
+sudo mv prometheus.yml /etc/prometheus/prometheus.yml
+
+Set ownership for directories:
+sudo chown -R prometheus:prometheus /etc/prometheus/ /data/
+
+Create a systemd unit configuration file for Prometheus:
+sudo vi /etc/systemd/system/prometheus.service
+
+Add the following content to the prometheus.service file:
+[Unit]
+Description=Prometheus
+Wants=network-online.target
+After=network-online.target
+
+StartLimitIntervalSec=500
+StartLimitBurst=5
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+Restart=on-failure
+RestartSec=5s
+ExecStart=/usr/local/bin/prometheus \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/data \
+  --web.console.templates=/etc/prometheus/consoles \
+  --web.console.libraries=/etc/prometheus/console_libraries \
+  --web.listen-address=0.0.0.0:9090 \
+  --web.enable-lifecycle
+
+[Install]
+WantedBy=multi-user.target
+
+Enable and start Prometheus:
+sudo systemctl enable prometheus
+sudo systemctl start prometheus
+
+Verify Prometheus's status:
+sudo systemctl status prometheus 
+
+//node exporter installation://
+sudo useradd --system --no-create-home --shell /bin/false node_exporter
+wget https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+
+Extract Node Exporter files, move the binary, and clean up:
+tar -xvf node_exporter-1.6.1.linux-amd64.tar.gz
+sudo mv node_exporter-1.6.1.linux-amd64/node_exporter /usr/local/bin/
+rm -rf node_exporter*
+
+Create a systemd unit configuration file for Node Exporter:
+sudo vi /etc/systemd/system/node_exporter.service
+
+Add the following content to the node_exporter.service file:
+[Unit]
+Description=Node Exporter
+Wants=network-online.target
+After=network-online.target
+
+StartLimitIntervalSec=500
+StartLimitBurst=5
+
+[Service]
+User=node_exporter
+Group=node_exporter
+Type=simple
+Restart=on-failure
+RestartSec=5s
+ExecStart=/usr/local/bin/node_exporter --collector.logind
+
+[Install]
+WantedBy=multi-user.target
+
+Note: Replace --collector.logind with any additional flags as needed.
+
+Enable and start Node Exporter:
+sudo systemctl enable node_exporter
+sudo systemctl start node_exporter
+
+Verify the Node Exporter's status:
+sudo systemctl status node_exporter	
+
+//Prometheus Configuration://
+
+To configure Prometheus to scrape metrics from Node Exporter and Jenkins, you need to modify the prometheus.yml file. 
+The path of prometheus.yml is; cd /etc/prometheus/ ----> ls -l ----> You can see the "prometheus.yml" file ----> sudo vi prometheus.yml ----> You will see the content and also there is a default job called "Prometheus" Paste the below content at the end of the file;
+
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['<MonitoringVMip>:9100']
+
+  - job_name: 'jenkins'
+    metrics_path: '/prometheus'
+    static_configs:
+      - targets: ['<your-jenkins-ip>:<your-jenkins-port>']
+
+
+//grffana://
+
+Update the package list and install Grafana:
+sudo apt-get update
+sudo apt-get -y install grafana
+
+Steps: Enable and Start Grafana Service:
+To automatically start Grafana after a reboot, enable the service:
+sudo systemctl enable grafana-server
+
+Start Grafana:
+sudo systemctl start grafana-server
+
+Steps: Check Grafana Status:
+Verify the status of the Grafana service to ensure it's running correctly:
+sudo systemctl status grafana-server
+
+//kubernets installation and configuration//
+
+Kubernetes Installation - Ubuntu
+
+Below Commands on Both Master - Slave(worker) Node (run command as root user)
+
+
+sudo apt-get update -y
+
+sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+
+sudo mkdir -p -m 755 /etc/apt/keyrings
+
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt-get update -y
+
+sudo apt-get install -y kubelet kubeadm kubectl
+
+sudo apt-mark hold kubelet kubeadm kubectl
+
+sudo swapoff -a
+
+sudo sed -i '/ swap / s/^(.*)$/#\1/g' /etc/fstab
+
+free -m
+
+sudo tee /etc/modules-load.d/k8s.conf <<EOF
+
+overlay
+
+br_netfilter
+
+EOF
+
+sudo modprobe overlay
+
+sudo modprobe br_netfilter
+
+sudo tee /etc/sysctl.d/kubernetes.conf<<EOF
+
+net.bridge.bridge-nf-call-ip6tables = 1
+
+net.bridge.bridge-nf-call-iptables = 1
+
+net.ipv4.ip_forward = 1
+
+EOF
+
+sudo sysctl --system
+
+sudo apt install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/docker-archive-keyring.gpg
+
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+sudo apt update -y
+
+sudo apt install -y containerd.io
+
+sudo mkdir -p /etc/containerd
+
+sudo containerd config default|sudo tee /etc/containerd/config.toml
+
+sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+
+sudo systemctl restart containerd
+
+sudo systemctl enable containerd
+
+systemctl status containerd
+
+--------------------------------------------------
+
+Master Only config:
+
+Run kubeadm from root user:
+
+kubeadm init --apiserver-advertise-address=172.31.3.229(masternodeprivateip) --pod-network-cidr=10.244.0.0/16
+
+Enter the commands shown as output as a regular user(ubuntu). Copy and keep your join command for slave node 
+-----------------------------------------
+kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+
+-----------------------------------------
+Slave only config:
+
+Run the join command as root user:
+
+kubeadm join 172.31.3.229:6443 --token t6u4tu.w17z374p5vzd8sie 
+--discovery-token-ca-cert-hash sha256:67582fe54e8b3dc7f8a39bf9ee4a12a9074a76be3c80d512b3a1ec3c6a6831e3
+
+(Note you will get this join command in your master node after kubeadm init)
+
+Confirm in master node, by running command kubectl get nodes
+-----------------------------------------------------------------
+
+
