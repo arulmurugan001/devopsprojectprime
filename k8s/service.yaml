@@ -1,13 +1,13 @@
-#service.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: amazon-prime-video-service
 spec:
+  type: NodePort
   selector:
     app: amazon-prime-video
   ports:
-    - protocol: TCP
-      port: 3000
-      targetPort: 3000
-  type: LoadBalancer
+  - port: 3000
+    targetPort: 3000
+    nodePort: 31502
+
