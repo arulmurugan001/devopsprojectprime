@@ -28,11 +28,12 @@ spec:
   selector:
     app: amazon-prime-video
   ports:
-  - protocal: TCP
+  - protocol: TCP
     port: 3000
     targetPort: 3000
     nodePort: 31502
   type: NodePort
+
 
 
 
